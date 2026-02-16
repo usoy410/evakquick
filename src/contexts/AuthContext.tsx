@@ -1,5 +1,4 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
-import { Alert } from "react-native";
 
 interface User {
   id: string;
@@ -10,9 +9,11 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  error: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is already logged in (simulate checking local storage)
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error("Auth check failed:", error);
         setUser(null);
+        setError("Failed to check authentication status");
       } finally {
         setIsLoading(false);
       }
@@ -42,6 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
+    setError(null);
+
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -55,7 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(fakeUser);
     } catch (error) {
-      Alert.alert("Login Failed", "Invalid email or password");
+      const errorMessage = error instanceof Error ? error.message : "Invalid email or password";
+      setError(errorMessage);
       throw error;
     } finally {
       setIsLoading(false);
@@ -64,6 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (name: string, email: string, password: string) => {
     setIsLoading(true);
+    setError(null);
+
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -77,7 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(fakeUser);
     } catch (error) {
-      Alert.alert("Signup Failed", "Failed to create account");
+      const errorMessage = error instanceof Error ? error.message : "Failed to create account";
+      setError(errorMessage);
       throw error;
     } finally {
       setIsLoading(false);
@@ -86,10 +95,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null);
+    setError(null);
+  };
+
+  const clearError = () => {
+    setError(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
+      error,
+      login,
+      signup,
+      logout,
+      clearError
+    }}>
       {children}
     </AuthContext.Provider>
   );

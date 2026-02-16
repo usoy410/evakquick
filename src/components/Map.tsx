@@ -1,31 +1,55 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Camera, CameraRef, MapView, PointAnnotation } from "@maplibre/maplibre-react-native";
 import * as Location from "expo-location";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function Map() {
   const cameraRef = useRef<CameraRef>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Try to get initial location when map loads
+    const getInitialLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+
+        if (status === "granted") {
+          const currentLocation = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+          setLocation(currentLocation);
+        }
+      } catch (error) {
+        console.error("Error getting initial location:", error);
+      }
+    };
+
+    getInitialLocation();
+  }, []);
 
   const getCurrentLocation = async () => {
+    setIsLoadingLocation(true);
+    setLocationError(null);
+
     try {
-      // Request location permissions
       const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== "granted") {
-        Alert.alert("Permission Denied", "Location access is required to center the map on your position.");
+        const errorMessage = "Location access is required to center the map on your position.";
+        setLocationError(errorMessage);
+        Alert.alert("Permission Denied", errorMessage);
         return;
       }
 
-      // Get current location
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
 
       setLocation(currentLocation);
 
-      // Center map on current location
       if (cameraRef.current) {
         cameraRef.current.setCamera({
           centerCoordinate: [
@@ -33,29 +57,30 @@ export default function Map() {
             currentLocation.coords.latitude,
           ],
           zoomLevel: 15,
-          animationDuration: 1000, // Smooth animation over 1 second
+          animationDuration: 1000,
         });
       }
     } catch (error) {
+      const errorMessage = "Unable to get your current location. Please try again.";
+      setLocationError(errorMessage);
       console.error("Error getting location:", error);
-      Alert.alert("Error", "Unable to get your current location. Please try again.");
+      Alert.alert("Error", errorMessage);
+    } finally {
+      setIsLoadingLocation(false);
     }
   };
 
   return (
     <View style={{ flex: 1 }}>
-      <MapView style={{ flex: 1 }}
-        mapStyle="https://tiles.openfreemap.org/styles/positron"
-      >
+      <MapView style={{ flex: 1 }} mapStyle="https://tiles.openfreemap.org/styles/positron">
         <Camera
           ref={cameraRef}
           defaultSettings={{
-            centerCoordinate: [123.2700, 13.6475], // [longitude, latitude] - Default to Tacloban City
+            centerCoordinate: [123.2700, 13.6475], // Tacloban City
             zoomLevel: 15,
           }}
         />
 
-        {/* User location marker */}
         {location && (
           <PointAnnotation
             id="user-location"
@@ -70,13 +95,17 @@ export default function Map() {
         )}
       </MapView>
 
-      {/* Focus button - positioned outside MapView to ensure visibility */}
       <TouchableOpacity
         style={styles.focusButton}
         onPress={getCurrentLocation}
         activeOpacity={0.7}
+        disabled={isLoadingLocation}
       >
-        <Ionicons name="locate" size={24} color="white" />
+        {isLoadingLocation ? (
+          <Ionicons name="hourglass-outline" size={24} color="white" />
+        ) : (
+          <Ionicons name="locate" size={24} color="white" />
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -101,7 +130,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
     elevation: 8,
-    zIndex: 1000, // Ensure button is on top of all other map elements
+    zIndex: 1000,
   },
   markerContainer: {
     alignItems: "center",
